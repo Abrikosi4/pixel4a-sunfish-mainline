@@ -1,0 +1,148 @@
+From: Abrikosi4 <116901278+Abrikosi4@users.noreply.github.com>
+Subject: [PATCH 5/5] arm64: dts: qcom: sunfish: add cs35l41 speaker audio
+
+Add the two Cirrus cs35l41 smart amplifiers (i2c9 @0x40/@0x41) that
+drive the Pixel 4a stereo speaker, wired to the ADSP via the Tertiary
+TDM playback backend, and a qcom,sm7150-sndcard machine node (reusing
+the sdm845 machine driver) exposing a MultiMedia1 playback frontend.
+
+Signed-off-by: Abrikosi4 <116901278+Abrikosi4@users.noreply.github.com>
+---
+--- a/arch/arm64/boot/dts/qcom/sm7150-google-sunfish.dts
++++ b/arch/arm64/boot/dts/qcom/sm7150-google-sunfish.dts
+@@ -11,6 +11,7 @@
+ #include <dt-bindings/leds/common.h>
+ #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
+ #include <dt-bindings/regulator/qcom,rpmh-regulator.h>
++#include <dt-bindings/sound/qcom,q6asm.h>
+ #include <dt-bindings/usb/pd.h>
+ 
+ #include "sm7150.dtsi"
+@@ -1004,3 +1005,127 @@
+ 
+ 	status = "okay";
+ };
++
++/*
++ * Audio: stereo speaker via two Cirrus cs35l41 smart amps on i2c9,
++ * fed by the ADSP (q6afe) Tertiary TDM playback backend. The amps are
++ * addressed as the "Left"/"Right" TDM speaker pair by the sdm845 machine
++ * driver (extended for Tertiary TDM).
++ */
++&i2c9 {
++	cs35l41_l: speaker-amp@40 {
++		#sound-dai-cells = <1>;
++		compatible = "cirrus,cs35l41";
++		reg = <0x40>;
++
++		interrupt-parent = <&tlmm>;
++		interrupts = <64 IRQ_TYPE_LEVEL_LOW>;
++
++		reset-gpios = <&pm6150l_gpios 8 GPIO_ACTIVE_HIGH>;
++
++		cirrus,boost-peak-milliamp = <3700>;
++		cirrus,boost-ind-nanohenry = <1000>;
++		cirrus,boost-cap-microfarad = <15>;
++		cirrus,asp-sdout-hiz = <3>;
++
++		cirrus,gpio2-src-select = <0x5>;
++		cirrus,gpio2-output-enable;
++
++		sound-name-prefix = "Left";
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&cs35l41_irq_l>;
++	};
++
++	cs35l41_r: speaker-amp@41 {
++		#sound-dai-cells = <1>;
++		compatible = "cirrus,cs35l41";
++		reg = <0x41>;
++
++		interrupt-parent = <&tlmm>;
++		interrupts = <65 IRQ_TYPE_LEVEL_LOW>;
++
++		reset-gpios = <&pm6150l_gpios 11 GPIO_ACTIVE_HIGH>;
++
++		cirrus,boost-peak-milliamp = <3700>;
++		cirrus,boost-ind-nanohenry = <1000>;
++		cirrus,boost-cap-microfarad = <15>;
++		cirrus,asp-sdout-hiz = <3>;
++
++		cirrus,gpio2-src-select = <0x5>;
++		cirrus,gpio2-output-enable;
++
++		sound-name-prefix = "Right";
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&cs35l41_irq_r>;
++	};
++};
++
++&q6afedai {
++	dai@38 {
++		reg = <TERTIARY_TDM_RX_0>;
++		qcom,tdm-sync-mode = <1>;
++		qcom,tdm-sync-src = <1>;
++		qcom,tdm-data-out = <0>;
++		qcom,tdm-invert-sync = <1>;
++		qcom,tdm-data-delay = <1>;
++		qcom,tdm-data-align = <0>;
++	};
++};
++
++&q6asmdai {
++	dai@0 {
++		reg = <MSM_FRONTEND_DAI_MULTIMEDIA1>;
++	};
++};
++
++&tlmm {
++	cs35l41_irq_l: cs35l41-irq-l-state {
++		pins = "gpio64";
++		function = "gpio";
++		bias-pull-down;
++		input-enable;
++	};
++
++	cs35l41_irq_r: cs35l41-irq-r-state {
++		pins = "gpio65";
++		function = "gpio";
++		bias-pull-down;
++		input-enable;
++	};
++};
++
++/ {
++	sound {
++		compatible = "qcom,sm7150-sndcard", "qcom,sdm845-sndcard";
++		model = "Pixel 4a";
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&ter_mi2s_active>;
++
++		mm1-dai-link {
++			link-name = "MultiMedia1";
++
++			cpu {
++				sound-dai = <&q6asmdai MSM_FRONTEND_DAI_MULTIMEDIA1>;
++			};
++		};
++
++		speaker-dai-link {
++			link-name = "Tertiary TDM Playback";
++
++			cpu {
++				sound-dai = <&q6afedai TERTIARY_TDM_RX_0>;
++			};
++
++			platform {
++				sound-dai = <&q6routing>;
++			};
++
++			codec {
++				sound-dai = <&cs35l41_l 0>, <&cs35l41_r 0>;
++			};
++		};
++	};
++};

@@ -1,0 +1,84 @@
+# Co-Maintainer: David Wronek <david@mainlining.org>
+# Co-Maintainer: Aelin <aelin@postmarketos.org>
+maintainer="Danila Tikhonov <danila@jiaxyga.com>"
+_flavor="postmarketos-qcom-sm7150"
+pkgname=linux-$_flavor
+pkgver=7.1_rc3
+pkgrel=13
+pkgdesc="Mainline Kernel fork for SM7150 devices"
+arch="aarch64"
+_carch="arm64"
+url="https://github.com/sm7150-mainline/linux"
+license="GPL-2.0-only"
+options="!strip !check !tracedeps
+	pmb:cross-native
+	pmb:kconfigcheck-community
+	"
+makedepends="
+	bison
+	clang
+	findutils
+	flex
+	lld
+	llvm
+	openssl-dev
+	perl
+	postmarketos-installkernel
+	python3
+	zstd
+"
+
+_tag="$pkgver"
+
+# Source
+source="
+	$pkgname-v$_tag.tar.gz::$url/archive/v$_tag.tar.gz
+	config-$_flavor.$arch
+	0001-arm64-dts-qcom-sunfish-add-ftm5-touchscreen.patch
+	0002-input-touchscreen-add-ftm5-driver.patch
+	0003-arm64-dts-qcom-sunfish-add-battery-fuel-gauge.patch
+	0004-asoc-qcom-sdm845-tertiary-tdm.patch
+	0005-arm64-dts-qcom-sunfish-add-cs35l41-audio.patch
+"
+builddir="$srcdir/linux-$_tag"
+
+prepare() {
+	default_prepare
+	cp "$srcdir/config-$_flavor.$arch" .config
+}
+
+build() {
+	unset LDFLAGS
+	make ARCH="$_carch" LLVM=1 \
+		KBUILD_BUILD_VERSION="$((pkgrel + 1 ))-$_flavor"
+}
+
+package() {
+	make modules_install zinstall dtbs_install \
+		ARCH="$_carch" \
+		LLVM=1 \
+		INSTALL_PATH="$pkgdir"/boot \
+		INSTALL_MOD_PATH="$pkgdir"/usr \
+		INSTALL_MOD_STRIP=1 \
+		INSTALL_DTBS_PATH="$pkgdir"/boot/dtbs-tmp
+
+	mkdir -p "$pkgdir"/boot/dtbs/qcom
+	cp -r "$pkgdir"/boot/dtbs-tmp/qcom/sm7150* "$pkgdir"/boot/dtbs/qcom
+	rm -rf "$pkgdir"/boot/dtbs-tmp
+
+	rm -f "$pkgdir"/lib/modules/*/build "$pkgdir"/lib/modules/*/source
+
+	install -D "$builddir"/include/config/kernel.release \
+		"$pkgdir"/usr/share/kernel/$_flavor/kernel.release
+}
+
+
+sha512sums="
+bb837959e337c66ff374d8f3aac6593723c4f4eb69fb18f9ff25c5c096c6656fd71149e105255c0f97c83e0bf547b0b0e94ca23eabde7b5f88308e9ecd784e3d  linux-postmarketos-qcom-sm7150-v7.1_rc3.tar.gz
+154bcf774c8453d0826108becf0a457aa4295880afd4a2e0b1f8cac2614720c85bfe7352d8f0203c1767f97e98aa7dce1ffaea0f11878aa822f9240058253e10  config-postmarketos-qcom-sm7150.aarch64
+60914bdad516120a86f6f7f026d9b6cc3f61f38679392c3e12d5eb357323a208f1d45e00c133d9d175f36d6df753a2a424794db431947222e3221eb25c591e2c  0001-arm64-dts-qcom-sunfish-add-ftm5-touchscreen.patch
+bdf6af3c4668ee39a74f9ceed2217d83ace6944849c57c8005ce1ecab363ee1646a6a46961a7c7926fdec8efb55fbebc08ca73a504bf51fd48d4dc8cbd8db6b6  0002-input-touchscreen-add-ftm5-driver.patch
+e1ac2d64c70b8525b4927deacba8e4928237b790c24e70e4a183d4ad196b90fe0983a76c1b4ee161c2073919af5ac45f82a33bd1efb39c09748af587841f2c8e  0003-arm64-dts-qcom-sunfish-add-battery-fuel-gauge.patch
+85d17e31f0f610f02c05f5ef79e8d1ec2b93aba826116d61e00ab839956481c5303af5266c60adb65318120dcc737bde5771024dff205f654d9e6e330d4492d9  0004-asoc-qcom-sdm845-tertiary-tdm.patch
+eb42296511928ee9c95c575a23f76e3d9a76d04699217b1326d53b37806b8327c3f0add9ca0f618dfa46e7d26a44672e50f97ad367f9cd31fc0c7d7c71a3b794  0005-arm64-dts-qcom-sunfish-add-cs35l41-audio.patch
+"

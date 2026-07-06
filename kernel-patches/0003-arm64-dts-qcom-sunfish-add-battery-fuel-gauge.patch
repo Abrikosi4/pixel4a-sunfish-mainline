@@ -1,0 +1,39 @@
+From: Abrikosi4 <116901278+Abrikosi4@users.noreply.github.com>
+Subject: [PATCH 3/3] arm64: dts: qcom: sunfish: enable QG fuel gauge + SMB2 charger
+
+Wire up the PM6150 QGauge (fuel gauge) and SMB2 charger so userspace gets
+battery capacity/voltage/current/temperature and charge status/online.
+Both nodes exist in pm6150.dtsi but are disabled and need a monitored-battery;
+add a simple-battery describing the Pixel 4a's 3140 mAh cell and enable them.
+
+Signed-off-by: Abrikosi4 <116901278+Abrikosi4@users.noreply.github.com>
+---
+--- a/arch/arm64/boot/dts/qcom/sm7150-google-sunfish.dts
++++ b/arch/arm64/boot/dts/qcom/sm7150-google-sunfish.dts
+@@ -651,6 +651,26 @@
+ 	status = "okay";
+ };
+ 
++/ {
++	battery: battery {
++		compatible = "simple-battery";
++		charge-full-design-microamp-hours = <3140000>;
++		voltage-min-design-microvolt = <3400000>;
++		voltage-max-design-microvolt = <4400000>;
++		constant-charge-current-max-microamp = <2000000>;
++	};
++};
++
++&pm6150_charger {
++	monitored-battery = <&battery>;
++	status = "okay";
++};
++
++&pm6150_qgauge {
++	monitored-battery = <&battery>;
++	status = "okay";
++};
++
+ &pm6150_typec {
+ 	vdd-vbus-supply = <&pm6150_vbus>;
+ 	vdd-pdphy-supply = <&vdda_usb_hs_3p1>;

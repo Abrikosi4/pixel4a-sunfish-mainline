@@ -1,0 +1,95 @@
+From: Abrikosi4 <116901278+Abrikosi4@users.noreply.github.com>
+Subject: [PATCH 4/5] ASoC: qcom: sdm845: support Tertiary TDM (Pixel 4a cs35l41)
+
+The sdm845 machine driver hardcodes Quaternary TDM for the stereo
+speaker-amp link. The Pixel 4a (sunfish, sm7150) wires its two cs35l41
+amplifiers on Tertiary TDM instead. Add TERTIARY_TDM_RX_0/TX_0 handling
+(clock id Q6AFE_LPASS_CLK_ID_TER_TDM_IBIT) mirroring the quaternary path,
+and register a qcom,sm7150-sndcard compatible.
+
+Signed-off-by: Abrikosi4 <116901278+Abrikosi4@users.noreply.github.com>
+---
+--- a/sound/soc/qcom/sdm845.c
++++ b/sound/soc/qcom/sdm845.c
+@@ -40,6 +40,7 @@
+ 	uint32_t pri_mi2s_clk_count;
+ 	uint32_t sec_mi2s_clk_count;
+ 	uint32_t quat_tdm_clk_count;
++	uint32_t tert_tdm_clk_count;
+ };
+ 
+ static struct snd_soc_jack_pin sdm845_jack_pins[] = {
+@@ -203,6 +204,8 @@
+ 			dev_err(rtd->dev,
+ 				"snd_soc_dai_set_sysclk err = %d\n", ret);
+ 		break;
++	case TERTIARY_TDM_RX_0:
++	case TERTIARY_TDM_TX_0:
+ 	case QUATERNARY_TDM_RX_0:
+ 	case QUATERNARY_TDM_TX_0:
+ 		ret = sdm845_tdm_snd_hw_params(substream, params);
+@@ -373,6 +376,41 @@
+ 		snd_soc_dai_set_fmt(codec_dai, codec_dai_fmt);
+ 		break;
+ 
++	case TERTIARY_TDM_RX_0:
++	case TERTIARY_TDM_TX_0:
++		if (++(data->tert_tdm_clk_count) == 1) {
++			snd_soc_dai_set_sysclk(cpu_dai,
++				Q6AFE_LPASS_CLK_ID_TER_TDM_IBIT,
++				TDM_BCLK_RATE, SNDRV_PCM_STREAM_PLAYBACK);
++		}
++
++		codec_dai_fmt |= SND_SOC_DAIFMT_IB_NF | SND_SOC_DAIFMT_DSP_B;
++
++		for_each_rtd_codec_dais(rtd, j, codec_dai) {
++
++			if (!strcmp(codec_dai->component->name_prefix,
++				    "Left")) {
++				ret = snd_soc_dai_set_fmt(
++						codec_dai, codec_dai_fmt);
++				if (ret < 0) {
++					dev_err(rtd->dev,
++						"Left TDM fmt err:%d\n", ret);
++					return ret;
++				}
++			}
++
++			if (!strcmp(codec_dai->component->name_prefix,
++				    "Right")) {
++				ret = snd_soc_dai_set_fmt(
++						codec_dai, codec_dai_fmt);
++				if (ret < 0) {
++					dev_err(rtd->dev,
++						"Right TDM slot err:%d\n", ret);
++					return ret;
++				}
++			}
++		}
++		break;
+ 	case QUATERNARY_TDM_RX_0:
+ 	case QUATERNARY_TDM_TX_0:
+ 		if (++(data->quat_tdm_clk_count) == 1) {
+@@ -447,6 +485,14 @@
+ 		}
+ 		break;
+ 
++	case TERTIARY_TDM_RX_0:
++	case TERTIARY_TDM_TX_0:
++		if (--(data->tert_tdm_clk_count) == 0) {
++			snd_soc_dai_set_sysclk(cpu_dai,
++				Q6AFE_LPASS_CLK_ID_TER_TDM_IBIT,
++				0, SNDRV_PCM_STREAM_PLAYBACK);
++		}
++		break;
+ 	case QUATERNARY_TDM_RX_0:
+ 	case QUATERNARY_TDM_TX_0:
+ 		if (--(data->quat_tdm_clk_count) == 0) {
+@@ -572,6 +618,7 @@
+ }
+ 
+ static const struct of_device_id sdm845_snd_device_id[]  = {
++	{ .compatible = "qcom,sm7150-sndcard" },
+ 	{ .compatible = "qcom,sdm845-sndcard" },
+ 	/* Do not grow the list for compatible devices */
+ 	{ .compatible = "qcom,db845c-sndcard" },
