@@ -12,7 +12,6 @@ The patches apply on top of that kernel's aport, in `source=` order.
 | Peripheral | State | Patch(es) |
 |---|---|---|
 | Touchscreen (STMicro FTM5) | ✅ working — multitouch, PM, recovery | `0001`, `0002` |
-| Battery gauge + charge status | ✅ working — capacity/voltage/current/temp + Charging/Discharging | `0003` |
 | Speaker amps (Cirrus cs35l41 ×2) | ⚠️ probe OK, but **audio blocked** upstream (see below) | `0004`, `0005` |
 | sxmo (Sway) gestures / profile | ✅ working | `sxmo/` |
 
@@ -34,12 +33,9 @@ downstream STMicro FTS sources. Features:
 IRQ tlmm gpio9, pm6150 gpio4 load-switch via pinctrl) and couples it to the
 panel via `panel = <&panel>`.
 
-## Battery (0003)
-
-Enables the already-present-but-disabled **PM6150 QG fuel gauge**
-(`qcom,pm6150-qg`) and **SMB2 charger** (`qcom,pm8150b-charger`) by adding a
-`simple-battery` (Pixel 4a 3140 mAh cell) and `monitored-battery`. Gives
-userspace capacity / voltage / current / temperature and charge status + online.
+Battery (PM6150 QGauge + SMB2 charger) is handled upstream in the
+sm7150-mainline fork by [PR #53](https://github.com/sm7150-mainline/linux/pull/53),
+so it is not carried here.
 
 ## Audio (0004, 0005) — ⚠️ blocked upstream, not by these patches
 
@@ -61,10 +57,10 @@ can't bootloop. They are ready to enable once the ADSP is stable.
 ## Applying
 
 Drop `kernel-patches/*.patch` into the `linux-postmarketos-qcom-sm7150` aport,
-add them to `source=` (order 0001→0005) and their `sha512sums`
+add them to `source=` (order 0001, 0002, 0004, 0005) and their `sha512sums`
 (`pmbootstrap checksum ...`), bump `pkgrel`, then
 `pmbootstrap build linux-postmarketos-qcom-sm7150`. `aport/APKBUILD` is the
-reference version wiring all five in (pkgrel 13). No kernel config changes are
+reference version wiring them in (pkgrel 13). No kernel config changes are
 needed — the required drivers (`SND_SOC_SDM845`, `SND_SOC_CS35L41_I2C`, QDSP6,
 cs35l41, ftm5's `CONFIG_TOUCHSCREEN_FTM5`) build fine.
 
