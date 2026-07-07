@@ -11,27 +11,28 @@ The patches apply on top of that kernel's aport, in `source=` order.
 
 | Peripheral | State | Patch(es) |
 |---|---|---|
-| Touchscreen (STMicro FTM5) | ✅ working — multitouch, PM, recovery | `0001`, `0002` |
+| Touchscreen (STMicro FTM5) | works locally, but **superseded upstream** by `stmfts5` (see below) | `0001`, `0002` |
 | Speaker amps (Cirrus cs35l41 ×2) | ⚠️ probe OK, but **audio blocked** upstream (see below) | `0004`, `0005` |
 | sxmo (Sway) gestures / profile | ✅ working | `sxmo/` |
 
-## Touchscreen — `ftm5` driver (0001, 0002)
+## Touchscreen — `ftm5` driver (0001, 0002) — superseded
 
 This unit uses an **STMicroelectronics FTM5** controller on `i2c7 @ 0x49`
-(chip id `0x4836`), not the Synaptics/other variant some sunfish units carry.
-Mainline `stmfts` bootloops on it, so `0002` adds a **from-scratch `ftm5.c`**
-driver (`compatible = "st,fts"`), with the FTM5 I2C protocol ported from the
-downstream STMicro FTS sources. Features:
+(chip id `0x4836`). `0002` is a **from-scratch `ftm5.c`** driver
+(`compatible = "st,fts"`) that reports multitouch, does DRM panel-follower PM
+(sensing tied to panel power) and ESD/watchdog fault recovery; `0001` is its
+`touchscreen@49` DT node. It works on this device, but it is **not the way
+this controller is going upstream.**
 
-- Type-B multitouch (10 points), coordinates confirmed 1:1 (0..1079 × 0..2339).
-- **DRM panel-follower** power management — touch sensing is powered with the
-  panel, off when the screen is off.
-- Chip-fault recovery (ESD / hard-fault / watchdog → reset + reinit),
-  controller-ready re-init.
-
-`0001` adds the `touchscreen@49` DT node (reset gpio8, AP/SLPI mux gpio72,
-IRQ tlmm gpio9, pm6150 gpio4 load-switch via pinctrl) and couples it to the
-panel via `panel = <&panel>`.
+The upstream direction is **David Heidelberg's `stmfts5` series** (extending
+the *existing* mainline `stmfts` driver to the FTS5/FTM5, on
+[LKML](https://lore.kernel.org/lkml/20260409-stmfts5-v4-0-64fe62027db5@ixit.cz/)),
+with sunfish DT + a `CONTROLLER_READY` poll fix already prepared by **miromraz**
+([miromraz/pixel4a-stmfts5-mainline](https://github.com/miromraz/pixel4a-stmfts5-mainline)).
+That poll fix resolves the very `stmfts` "bootloop" this separate driver worked
+around, so a standalone `ftm5` driver on the same `st,fts` compatible would
+collide with `stmfts5` once it lands. **Use `stmfts5`, not these patches** —
+`0001`/`0002` are kept here only as a personal reference implementation.
 
 Battery (PM6150 QGauge + SMB2 charger) is handled upstream in the
 sm7150-mainline fork by [PR #53](https://github.com/sm7150-mainline/linux/pull/53),
